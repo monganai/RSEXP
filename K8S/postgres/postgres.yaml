@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rs-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rs-postgres
+  template:
+    metadata:
+      labels:
+        app: rs-postgres
+      annotations:
+        ad.datadoghq.com/postgres.check_names: '[postgres]'
+        ad.datadoghq.com/postgres.init_configs: '[{}]'
+        ad.datadoghq.com/postgres.instances: '[{"host": "%%host%%", "port" : 5432, "username": "datadog", "password", "password"}]'
+        ad.datadoghq.com/postgres.logs: '[{"source":"postgresql","service":"postgresql"}]'
+
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:latest
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: rs-postgres-config
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: rs-postgredb
+      volumes:
+        - name: rs-postgredb
+          persistentVolumeClaim:
+            claimName: rs-postgres-pv-claim
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rs-postgres
+spec:
+  selector:
+    app: rs-postgres
+  ports:
+    - name: http
+      protocol: TCP
+      port: 5432
+      nodePort: 30016
+  type: LoadBalancer
+
+
+
+

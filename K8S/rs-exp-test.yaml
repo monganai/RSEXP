@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ridesafe-exp
+  labels:
+    tags.datadoghq.com/env: "exp"
+    tags.datadoghq.com/service: "rs-exp"
+    tags.datadoghq.com/version: "1.0b"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ridesafe-exp
+  template:
+    metadata:
+      labels:
+        app: ridesafe-exp
+        tags.datadoghq.com/env: "exp"
+        tags.datadoghq.com/service: "rs-exp"
+        tags.datadoghq.com/version: "1.0b"
+      annotations:
+        ad.datadoghq.com/rsexp.logs: >-
+          [{
+            "source": "ridesafe-exp",
+            "service": "ridesafe-exp",
+            "log_processing_rules": [{
+              "type": "multi_line",
+              "name": "log_start_with_date",
+              "pattern" : "\\[\\d{4}-\\d{2}-\\d{2}\\s\\d{2}:\\d{2}:\\d{2}\\s\\+\\d{4}\\]"
+            }]
+          }] 
+          #|| \\[\\d{2}\\/...\\/\\d{4}:\\d{2}:\\d{2}:\\d{2}\\s\\+\\d{4}\\]
+
+    spec:
+      containers:
+        - name: rsexp
+          image: monganai/ridesafeapi-exp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: DD_ENV
+              value: "exp"
+            - name: DD_SERVICE
+              value: "rs-exp"
+            - name: DD_VERSION
+              value: "1.0b"
+            - name: DD_LOGS_INJECTION
+              value: "true"
+            - name: DD_CLIENT_TOKEN
+              value: "12345"
+            - name: DD_APPLICATION_ID
+              value: "12345"
+            - name: DD_TAGS
+              value: "lang:python"
+            - name: DD_AGENT_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: GUNICORN_CMD_ARGS
+              value: "--name 'ridesafe-api' --statsd-host $(DD_AGENT_HOST):8122 --bind=0.0.0.0:8080 --workers=4 --access-logfile '-' --access-logformat '%(t)s %(h)s %(q)s %(H)s %(s)s %(B)s %(p)s %(r)s %(b)s %(a)s' --log-level 'debug'"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ridesafe-exp
+spec:
+  selector:
+    app: ridesafe-exp
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      nodePort: 30051
+  type: LoadBalancer
